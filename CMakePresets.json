@@ -1,0 +1,31 @@
+{
+    "version": 3,
+    "configurePresets": [
+      {
+        "name": "VS2022",
+        "generator": "Visual Studio 17 2022",
+        "architecture": {
+          "value": "x64",
+          "strategy": "external"
+        },
+        "binaryDir": "build/${presetName}-Project",
+        "cacheVariables": {
+          "CMAKE_TOOLCHAIN_FILE": "./build/vcpkg/scripts/buildsystems/vcpkg.cmake",
+          "VCPKG_MANIFEST_INSTALL": "OFF",
+          "VCPKG_FEATURE_FLAGS": "versions"
+        }
+      }
+    ],
+    "buildPresets": [
+      {
+        "name": "Debug",
+        "configurePreset": "VS2022",
+        "configuration": "Debug"
+      },
+      {
+        "name": "RelWithDebInfo",
+        "configurePreset": "VS2022",
+        "configuration": "RelWithDebInfo"
+      }
+    ]
+  }
