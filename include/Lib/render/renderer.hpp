@@ -50,6 +50,16 @@ struct Image
         for (auto i = 0; i < pixel_count; ++i)
         {
             auto mean = sample_sum[i] / sample_count[i];
+            mean *= 255.f;
+            result[i] = u8x4(mean, 255);
+        }
+    }
+
+    void calculate_result_with_gamma_correction()
+    {
+        for (auto i = 0; i < pixel_count; ++i)
+        {
+            auto mean = sample_sum[i] / sample_count[i];
             mean = glm::sqrt(mean); // gamma correction with g=2
             mean *= 255.f;
             result[i] = u8x4(mean, 255);
@@ -119,7 +129,7 @@ struct Renderer
     u32 rays_per_update = 500'000;
     u32 camera_rays_per_update = 0;
 
-    bool activate_new_strategy = false;
+    bool activate_new_strategy = true;
 
     // resources
     GL::Texture2D gl_image;
@@ -204,7 +214,13 @@ struct Renderer
         {
             auto & ray = rays.back();
 
-            auto hit = scene.hit(ray, {0, std::numeric_limits<f32>::max()});
+            Hit hit;
+            
+            if (activate_new_strategy)
+                hit = scene.bvh.hit(ray, {0, std::numeric_limits<f32>::max()});
+            else
+                hit = scene.hittable_list.hit(ray, {0, std::numeric_limits<f32>::max()});
+
             if (hit.is_hit)
             {
                 ray.color *= hit.attenuation;
@@ -246,7 +262,7 @@ struct Renderer
         if (frame_info.idx % render_interval != 0)
             return;
 
-        image.calculate_result();
+        image.calculate_result_with_gamma_correction();
 
         glTextureSubImage2D(
             gl_image.id, 0,
