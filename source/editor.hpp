@@ -49,6 +49,18 @@ struct Editor
         }
         Checkbox("New Strategy Active", &renderer.activate_new_strategy);
         {
+            static array names = {
+                "None", "BVH", "BVH_8WIDE"
+            };
+            if (BeginCombo("Acceleration", names[(u32)renderer.accelerator]))
+            {
+                for (auto i = 0; i < names.size(); ++i)
+                    if (Selectable(names[i]))
+                        renderer.accelerator = (Render::Renderer::Accelerator)i;
+                EndCombo();
+            }
+        }
+        {
             u32 min = 1, max = 64;
             SliderScalar("Samples per Pixel", ImGuiDataType_U32, &renderer.sample_per_pixel, &min, &max);
         }

@@ -1,9 +1,9 @@
 #pragma once
 
 #if defined(NDEBUG)
-constexpr bool DEBUG = false;
+#define DEBUG false
 #else
-constexpr bool DEBUG = true;
+#define DEBUG true
 #endif
 
 constexpr bool GL_DEBUG = true;

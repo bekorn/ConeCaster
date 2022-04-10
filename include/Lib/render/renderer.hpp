@@ -128,8 +128,11 @@ struct Renderer
     u32 scatter_count = 2;
     u32 rays_per_update = 500'000;
     u32 camera_rays_per_update = 0;
+    enum class Accelerator
+    { None, BVH, BVH_8WIDE }
+    accelerator = Accelerator::BVH_8WIDE;
 
-    bool activate_new_strategy = true;
+    bool activate_new_strategy = false;
 
     // resources
     GL::Texture2D gl_image;
@@ -215,11 +218,15 @@ struct Renderer
             auto & ray = rays.back();
 
             Hit hit;
-            
-            if (activate_new_strategy)
-                hit = scene.bvh.hit(ray, {0, std::numeric_limits<f32>::max()});
-            else
-                hit = scene.hittable_list.hit(ray, {0, std::numeric_limits<f32>::max()});
+            switch (accelerator)
+            {
+                case Accelerator::None:
+                    hit = scene.hittable_list.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
+                case Accelerator::BVH:
+                    hit = scene.bvh.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
+                case Accelerator::BVH_8WIDE:
+                    hit = scene.bvh_8wide.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
+            }
 
             if (hit.is_hit)
             {

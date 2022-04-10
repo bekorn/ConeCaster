@@ -1,5 +1,5 @@
 Cone casting, duh
-BVH
+Better BVH construction
 Ray-Triangle intersection
 GLTF loading
 Blue noise sampling
