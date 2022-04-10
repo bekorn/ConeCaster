@@ -14,7 +14,7 @@ struct Image
     u32 pixel_count;
     unique_array<f32x3> sample_sum; // color range [0-1]
     unique_array<f32> sample_count;
-    unique_array<u8x4> result; // color range [0-255]
+    unique_array<u8x4> result;      // color range [0-255]
 
     void create(u32x2 dimensions)
     {
@@ -221,7 +221,7 @@ struct Renderer
             switch (accelerator)
             {
                 case Accelerator::None:
-                    hit = scene.hittable_list.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
+                    hit = scene.hittables.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
                 case Accelerator::BVH:
                     hit = scene.bvh.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
                 case Accelerator::BVH_8WIDE:

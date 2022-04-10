@@ -7,6 +7,7 @@
 
 #include <chrono>
 
+template<typename Duration = std::chrono::microseconds>
 struct Timer
 {
 	// https://en.cppreference.com/w/cpp/chrono/high_resolution_clock see Notes paragraph 2
@@ -23,17 +24,17 @@ struct Timer
 
 	struct TimeElapsed
 	{
-		std::chrono::microseconds cpu;
-		std::chrono::microseconds wall;
+		Duration cpu;
+		Duration wall;
 	};
 
 	TimeElapsed timeit()
 	{
 		auto cpu_now = cpu_clock::now();
-		auto cpu_diff = std::chrono::duration_cast<std::chrono::microseconds>(cpu_now - cpu_last);
+		auto cpu_diff = std::chrono::duration_cast<Duration>(cpu_now - cpu_last);
 
 		auto wall_now = wall_clock::now();
-		auto wall_diff = std::chrono::duration_cast<std::chrono::microseconds>(wall_now - wall_last);
+		auto wall_diff = std::chrono::duration_cast<Duration>(wall_now - wall_last);
 
 		cpu_last = cpu_now;
 		wall_last = wall_now;
