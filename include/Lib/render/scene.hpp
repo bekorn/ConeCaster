@@ -90,7 +90,7 @@ struct AABB_8wide
         auto min_x = _mm256_set_ps(aabbs[7].min.x, aabbs[6].min.x, aabbs[5].min.x, aabbs[4].min.x, aabbs[3].min.x, aabbs[2].min.x, aabbs[1].min.x, aabbs[0].min.x);
         auto min_y = _mm256_set_ps(aabbs[7].min.y, aabbs[6].min.y, aabbs[5].min.y, aabbs[4].min.y, aabbs[3].min.y, aabbs[2].min.y, aabbs[1].min.y, aabbs[0].min.y);
         auto min_z = _mm256_set_ps(aabbs[7].min.z, aabbs[6].min.z, aabbs[5].min.z, aabbs[4].min.z, aabbs[3].min.z, aabbs[2].min.z, aabbs[1].min.z, aabbs[0].min.z);
- 
+
         auto max_x = _mm256_set_ps(aabbs[7].max.x, aabbs[6].max.x, aabbs[5].max.x, aabbs[4].max.x, aabbs[3].max.x, aabbs[2].max.x, aabbs[1].max.x, aabbs[0].max.x);
         auto max_y = _mm256_set_ps(aabbs[7].max.y, aabbs[6].max.y, aabbs[5].max.y, aabbs[4].max.y, aabbs[3].max.y, aabbs[2].max.y, aabbs[1].max.y, aabbs[0].max.y);
         auto max_z = _mm256_set_ps(aabbs[7].max.z, aabbs[6].max.z, aabbs[5].max.z, aabbs[4].max.z, aabbs[3].max.z, aabbs[2].max.z, aabbs[1].max.z, aabbs[0].max.z);
@@ -116,6 +116,67 @@ struct AABB_8wide
 
         u8 results = _mm256_movemask_ps(_mm256_cmp_ps(range_max, range_min, _CMP_GT_OQ));
         return {results};
+    }
+
+    struct HitsSorted
+    {
+        u8 hittable_idx[8];
+        u8 hit_count;
+    };
+
+    HitsSorted hit_sorted(Ray const & ray, Range<f32> const & range) const
+    {
+        auto inv_dir = 1.f / ray.dir;
+
+        // min and max arder is reversed so the outcome is in correct order
+        auto min_x = _mm256_set_ps(aabbs[7].min.x, aabbs[6].min.x, aabbs[5].min.x, aabbs[4].min.x, aabbs[3].min.x, aabbs[2].min.x, aabbs[1].min.x, aabbs[0].min.x);
+        auto min_y = _mm256_set_ps(aabbs[7].min.y, aabbs[6].min.y, aabbs[5].min.y, aabbs[4].min.y, aabbs[3].min.y, aabbs[2].min.y, aabbs[1].min.y, aabbs[0].min.y);
+        auto min_z = _mm256_set_ps(aabbs[7].min.z, aabbs[6].min.z, aabbs[5].min.z, aabbs[4].min.z, aabbs[3].min.z, aabbs[2].min.z, aabbs[1].min.z, aabbs[0].min.z);
+ 
+        auto max_x = _mm256_set_ps(aabbs[7].max.x, aabbs[6].max.x, aabbs[5].max.x, aabbs[4].max.x, aabbs[3].max.x, aabbs[2].max.x, aabbs[1].max.x, aabbs[0].max.x);
+        auto max_y = _mm256_set_ps(aabbs[7].max.y, aabbs[6].max.y, aabbs[5].max.y, aabbs[4].max.y, aabbs[3].max.y, aabbs[2].max.y, aabbs[1].max.y, aabbs[0].max.y);
+        auto max_z = _mm256_set_ps(aabbs[7].max.z, aabbs[6].max.z, aabbs[5].max.z, aabbs[4].max.z, aabbs[3].max.z, aabbs[2].max.z, aabbs[1].max.z, aabbs[0].max.z);
+
+        auto t0_x = _mm256_mul_ps(_mm256_sub_ps(min_x, _mm256_set1_ps(ray.pos.x)), _mm256_set1_ps(inv_dir.x));
+        auto t0_y = _mm256_mul_ps(_mm256_sub_ps(min_y, _mm256_set1_ps(ray.pos.y)), _mm256_set1_ps(inv_dir.y));
+        auto t0_z = _mm256_mul_ps(_mm256_sub_ps(min_z, _mm256_set1_ps(ray.pos.z)), _mm256_set1_ps(inv_dir.z));
+
+        auto t1_x = _mm256_mul_ps(_mm256_sub_ps(max_x, _mm256_set1_ps(ray.pos.x)), _mm256_set1_ps(inv_dir.x));
+        auto t1_y = _mm256_mul_ps(_mm256_sub_ps(max_y, _mm256_set1_ps(ray.pos.y)), _mm256_set1_ps(inv_dir.y));
+        auto t1_z = _mm256_mul_ps(_mm256_sub_ps(max_z, _mm256_set1_ps(ray.pos.z)), _mm256_set1_ps(inv_dir.z));
+
+        auto t_min_x = _mm256_min_ps(t0_x, t1_x);
+        auto t_min_y = _mm256_min_ps(t0_y, t1_y);
+        auto t_min_z = _mm256_min_ps(t0_z, t1_z);
+
+        auto t_max_x = _mm256_max_ps(t0_x, t1_x);
+        auto t_max_y = _mm256_max_ps(t0_y, t1_y);
+        auto t_max_z = _mm256_max_ps(t0_z, t1_z);
+
+        auto range_min = _mm256_max_ps(_mm256_max_ps(_mm256_max_ps(t_min_x, t_min_y), t_min_z), _mm256_set1_ps(range.min));
+        auto range_max = _mm256_min_ps(_mm256_min_ps(_mm256_min_ps(t_max_x, t_max_y), t_max_z), _mm256_set1_ps(range.max));
+
+        f32 range_mins[8];
+        _mm256_storeu_ps(range_mins, range_min);
+
+        u32 is_hits[8];
+        _mm256_storeu_ps(reinterpret_cast<f32*>(&is_hits), _mm256_cmp_ps(range_max, range_min, _CMP_GT_OQ));
+
+        HitsSorted hits{
+            .hit_count = 0
+        };
+
+        //  only store idxs which is_hit[idx] == true
+        for (auto i = 0; i < 8; ++i)
+            if (is_hits[i])
+                hits.hittable_idx[hits.hit_count++] = i;
+
+        std::sort(
+            hits.hittable_idx, hits.hittable_idx + hits.hit_count,
+            [&range_mins](auto idx1, auto idx2){ return range_mins[idx1] < range_mins[idx2]; }
+        );
+
+        return hits;
     }
 };
 
@@ -210,7 +271,7 @@ struct BoundingVolume final : Hittable
 
 struct BoundingVolume_8wide final : Hittable
 {
-    array<Hittable *,8> hittables;
+    array<Hittable *, 8> hittables;
     AABB_8wide aabbs;
 
     void create(span<AABBHeuristic> const & heuristics)
@@ -280,23 +341,38 @@ struct BoundingVolume_8wide final : Hittable
         for (auto i = 0; i < 8; ++i)
             aabbs.aabbs[i] = hittables[i]->aabb();
     }
- 
+
     Hit hit(Ray const & ray, Range<f32> range) const final
     {
         Hit closest{.is_hit = false};
 
-        auto aabb_hits = aabbs.hit(ray, range);
-
-        for (auto i = 0; i < 8; ++i)
-            if (aabb_hits[i])
+        if constexpr (true) // should use aabb hit distance order
+        {
+            auto aabb_hits = aabbs.hit_sorted(ray, range);
+            for (auto i = 0; i < aabb_hits.hit_count; ++i)
             {
-                auto hit = hittables[i]->hit(ray, range);
+                auto hit = hittables[aabb_hits.hittable_idx[i]]->hit(ray, range);
                 if (hit.is_hit)
                 {
                     closest = hit;
                     range.max = hit.dist;
                 }
             }
+        }
+        else
+        {
+            auto aabb_hits = aabbs.hit(ray, range);
+            for (auto i = 0; i < 8; ++i)
+                if (aabb_hits[i])
+                {
+                    auto hit = hittables[i]->hit(ray, range);
+                    if (hit.is_hit)
+                    {
+                        closest = hit;
+                        range.max = hit.dist;
+                    }
+                }
+        }
 
         return closest;
     }
