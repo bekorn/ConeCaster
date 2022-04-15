@@ -63,7 +63,7 @@ struct AABB
         auto t_max = glm::max(t0, t1);
         auto range_min = compMax(f32x4{t_min, range.min});
         auto range_max = compMin(f32x4{t_max, range.max});
-        return (range_max > range_min);
+        return (range_max >= range_min);
     }
 
     f32x3 center() const
@@ -114,7 +114,7 @@ struct AABB_8wide
         auto range_min = _mm256_max_ps(_mm256_max_ps(_mm256_max_ps(t_min_x, t_min_y), t_min_z), _mm256_set1_ps(range.min));
         auto range_max = _mm256_min_ps(_mm256_min_ps(_mm256_min_ps(t_max_x, t_max_y), t_max_z), _mm256_set1_ps(range.max));
 
-        u8 results = _mm256_movemask_ps(_mm256_cmp_ps(range_max, range_min, _CMP_GT_OQ));
+        u8 results = _mm256_movemask_ps(_mm256_cmp_ps(range_max, range_min, _CMP_GE_OQ));
         return {results};
     }
 
@@ -160,7 +160,7 @@ struct AABB_8wide
         _mm256_storeu_ps(range_mins, range_min);
 
         u32 is_hits[8];
-        _mm256_storeu_ps(reinterpret_cast<f32*>(&is_hits), _mm256_cmp_ps(range_max, range_min, _CMP_GT_OQ));
+        _mm256_storeu_ps(reinterpret_cast<f32*>(&is_hits), _mm256_cmp_ps(range_max, range_min, _CMP_GE_OQ));
 
         HitsSorted hits{
             .hit_count = 0
@@ -434,6 +434,110 @@ struct Sphere final : Hittable
     }
 };
 
+struct Triangle final : Hittable
+{
+    f32x3 vert[3];
+    f32x3 col[3];
+
+    Hit hit(Ray const & ray, Range<f32> range) const
+    { return hit_mt(ray, range); }
+
+    // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
+    Hit hit_mt(Ray const & ray, Range<f32> range) const
+    {
+        auto edge_0to1 = vert[1] - vert[0];
+        auto edge_0to2 = vert[2] - vert[0];
+
+        auto _k = cross(ray.dir, edge_0to2);
+        auto determinant = dot(edge_0to1, _k);
+
+        if (glm::abs(determinant) < glm::epsilon<f32>())
+            return {.is_hit = false};
+
+        auto _m = ray.pos - vert[0];
+        auto u = dot(_m, _k) / determinant;
+        if (u < 0 | u > 1)
+            return {.is_hit = false};
+        
+        auto _n = cross(_m, edge_0to1);
+        auto v = dot(ray.dir, _n) / determinant;
+        if (v < 0 | u + v > 1)
+            return {.is_hit = false};
+        
+        auto t = dot(edge_0to2, _n) / determinant;
+        auto pos = ray.at(t);
+        auto normal = normalize(cross(edge_0to1, edge_0to2));
+        auto barycentric = f32x3{1 - u - v, u, v};
+
+        return {
+            .is_hit = true,
+            .pos = pos,
+            .dist = t,
+            .normal = normal,
+            .attenuation = {barycentric[0] * col[0] + barycentric[1] * col[1] + barycentric[2] * col[2]},
+            // .attenuation = {0.2, 0.4, 1},
+        };
+    }
+
+    // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates
+    Hit hit_barycentrics(Ray const & ray, Range<f32> range) const
+    {
+        // triangle's plane: dot(hit.pos, normal) + K = 0
+        auto normal = cross(vert[2] - vert[0], vert[1] - vert[0]);
+        auto area2 = length(normal); // length(cross product) yields area * 2
+        normal = normalize(normal);
+        auto K = -dot(vert[0], normal);
+
+        // ray: ray.pos + ray.dir * t = hit.pos;
+        // intersection: t = -(K + dot(ray.pos, normal)) / dot(ray.pos, normal)
+        auto ray_dir_dot_normal = dot(ray.dir, normal);
+        if (glm::abs(ray_dir_dot_normal) < glm::epsilon<f32>()) // ray and plane are parallel
+            return {.is_hit = false};
+
+        auto t = -(K + dot(ray.pos, normal)) / ray_dir_dot_normal;
+        if (not range.contains(t))
+            return {.is_hit = false};
+
+        auto pos = ray.at(t);
+
+        // calculate barycentric coordinates
+        auto cross_0to1 = cross(pos - vert[0], vert[1] - vert[0]);
+        auto cross_1to2 = cross(pos - vert[1], vert[2] - vert[1]);
+        auto cross_2to0 = cross(pos - vert[2], vert[0] - vert[2]);
+        auto barycentric = f32x3{
+            length(cross_1to2) / area2,
+            length(cross_2to0) / area2,
+            0
+        };
+        barycentric.z = 1.f - barycentric.x - barycentric.y;
+
+        // test if pos is inside the triangle
+        auto on_left_of_edge01 = dot(normal, cross_0to1) >= 0.f;
+        auto on_left_of_edge12 = dot(normal, cross_1to2) >= 0.f;
+        auto on_left_of_edge20 = dot(normal, cross_2to0) >= 0.f;
+        auto is_inside = on_left_of_edge01 & on_left_of_edge12 & on_left_of_edge20;
+
+        if (not is_inside)
+            return {.is_hit = false};
+
+        return {
+            .is_hit = true,
+            .pos = pos,
+            .dist = t,
+            .normal = normal,
+            .attenuation = {barycentric[0] * col[0] + barycentric[1] * col[1] + barycentric[2] * col[2]},
+        };
+    }
+
+    AABB aabb() const 
+    {
+        return {
+            .min = min(min(vert[0], vert[1]), vert[2]),
+            .max = max(max(vert[0], vert[1]), vert[2])
+        };
+    }
+};
+
 struct HittableVector final : Hittable
 {
     vector<Hittable *> hittables;
@@ -472,7 +576,7 @@ struct Scene
 {
     f32x3 background_color_up{0.63, 0.87, 0.99};
     f32x3 background_color_down{1, 1, 1};
-    std::array<Sphere, 1000> spheres;
+    std::array<Sphere, 3> spheres;
 
     HittableVector hittables;
     BoundingVolume bvh;
@@ -488,11 +592,25 @@ struct Scene
             sphere.color = Random::next(f32x3(0), f32x3(1));
         }
 
-        spheres[0].r = 100;
-        spheres[0].pos = {0, 0, 0};
-        spheres[0].color = {0.8, 0.8, 0.1};
+        f32x3 vertices[] = {
+            {-120, 0, 0},
+            {200, 0, 0},
+            {0, 0, 100},
+        };
+        f32x3 colors[] = {
+            {1, 0, 0},
+            {0, 1, 0},
+            {0, 0, 1},
+        };
+        auto triangle = new Triangle();
+        for (auto i = 0; i < 3; ++i)
+            triangle->vert[i] = vertices[i], triangle->col[i] = colors[i];
+        hittables.hittables.push_back(triangle);
 
-        hittables.hittables.reserve(spheres.size());
+        for (auto i = 0; i < 3; ++i)
+            spheres[i].pos = vertices[i], spheres[i].color = colors[i], spheres[i].r = 10;
+
+        hittables.hittables.reserve(spheres.size() + 1);
         for (auto & sphere: spheres)
             hittables.hittables.push_back(&sphere);
 
