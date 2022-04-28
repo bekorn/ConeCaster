@@ -180,20 +180,26 @@ struct AABB_8wide
     }
 };
 
+struct Hittable;
+
 struct Hit
 {
     bool is_hit;
-
     f32x3 pos;
     f32 dist;
-    f32x3 normal;
+    Hittable * hittable;
+};
 
+struct Shade
+{
+    f32x3 normal;
     f32x3 attenuation;
 };
 
 struct Hittable
 {
     virtual Hit hit(Ray const &, Range<f32>) const = 0;
+    virtual Shade shade(Hit const&) const = 0;
     virtual AABB aabb() const  = 0;
 };
 
@@ -264,6 +270,9 @@ struct BoundingVolume final : Hittable
 
         return closest;
     }
+
+    Shade shade(Hit const&) const final
+    { return {}; }
 
     AABB aabb() const final
     { return AABB::merge(aabbs[0], aabbs[1]); }
@@ -376,6 +385,9 @@ struct BoundingVolume_8wide final : Hittable
 
         return closest;
     }
+    
+    Shade shade(Hit const&) const final
+    { return {}; }
 
     AABB aabb() const final
     {
@@ -416,11 +428,18 @@ struct Sphere final : Hittable
             return { .is_hit = false };
 
         auto hit_pos = ray.at(distance);
-        return Hit{
+        return {
             .is_hit = true,
             .pos = hit_pos,
             .dist = distance,
-            .normal = (hit_pos - pos) / r,
+            .hittable = (Hittable*)this,
+        };
+    }
+
+    Shade shade(Hit const & hit) const final
+    {
+        return {
+            .normal = normalize(hit.pos - pos),
             .attenuation = color,
         };
     }
@@ -473,9 +492,7 @@ struct Triangle final : Hittable
             .is_hit = true,
             .pos = pos,
             .dist = t,
-            .normal = normal,
-            .attenuation = {barycentric[0] * col[0] + barycentric[1] * col[1] + barycentric[2] * col[2]},
-            // .attenuation = {0.2, 0.4, 1},
+            .hittable = (Hittable*)this,
         };
     }
 
@@ -524,6 +541,27 @@ struct Triangle final : Hittable
             .is_hit = true,
             .pos = pos,
             .dist = t,
+            .hittable = (Hittable*)this,
+        };
+    }
+
+    Shade shade(Hit const & hit) const final
+    {
+        // calculate barycentric coordinates
+        auto normal = cross(vert[2] - vert[0], vert[1] - vert[0]);
+        auto area2 = length(normal); // length(cross product) yields area * 2
+        normal = normalize(normal);
+        auto cross_0to1 = cross(hit.pos - vert[0], vert[1] - vert[0]);
+        auto cross_1to2 = cross(hit.pos - vert[1], vert[2] - vert[1]);
+        auto cross_2to0 = cross(hit.pos - vert[2], vert[0] - vert[2]);
+        auto barycentric = f32x3{
+            length(cross_1to2) / area2,
+            length(cross_2to0) / area2,
+            0
+        };
+        barycentric.z = 1.f - barycentric.x - barycentric.y;
+
+        return {
             .normal = normal,
             .attenuation = {barycentric[0] * col[0] + barycentric[1] * col[1] + barycentric[2] * col[2]},
         };
@@ -559,6 +597,9 @@ struct HittableVector final : Hittable
         return closest;
     }
 
+    Shade shade(Hit const&) const final
+    { return {}; }
+
     AABB aabb() const final
     {
         assert(not hittables.empty());
@@ -576,7 +617,7 @@ struct Scene
 {
     f32x3 background_color_up{0.63, 0.87, 0.99};
     f32x3 background_color_down{1, 1, 1};
-    std::array<Sphere, 3> spheres;
+    std::array<Sphere, 1000> spheres;
 
     HittableVector hittables;
     BoundingVolume bvh;

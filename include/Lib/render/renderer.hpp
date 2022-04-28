@@ -230,14 +230,15 @@ struct Renderer
 
             if (hit.is_hit)
             {
-                ray.color *= hit.attenuation;
+                auto shade = hit.hittable->shade(hit);
+                ray.color *= shade.attenuation;
 
                 if (ray.bounce == bounce_limit)
                     image.add_sample(ray.pixel, ray.color);
                 else
                     for (auto _ = ray.bounce < scatter_count ? 3 : 1; _ > 0; --_)
                     {
-                        auto bounce_dir = normalize(hit.normal + Random::next_on_unit_sphere());
+                        auto bounce_dir = normalize(shade.normal + Random::next_on_unit_sphere());
                         auto bounce_pos = hit.pos + bounce_dir * 0.001f;
 
                         generated_rays.push_back({
