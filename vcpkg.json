@@ -31,6 +31,10 @@
       {
         "name": "stb",
         "version>=": "2020-09-14"
+      },
+      {
+        "name": "fmt",
+        "version>=": "8.1.1"
       }
     ],
     "builtin-baseline": "440075a9fccf52cab386521967e4f074acd1bd34"

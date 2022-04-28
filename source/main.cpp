@@ -12,7 +12,7 @@ i32 main()
     GLFW::Context glfw_context;
     if (auto error = glfw_context.create())
     {
-        std::cerr << error.value();
+        fmt::print(stderr, "{}", error.value());
         return 1;
     }
 
@@ -24,11 +24,11 @@ i32 main()
         .gl_major = GL::VERSION_MAJOR, .gl_minor = GL::VERSION_MINOR,
     }))
     {
-        std::cerr << error.value();
+        fmt::print(stderr, "{}", error.value());
         return 1;
     }
 
-    std::clog << GL::GetContextInfo() << '\n';
+    fmt::print(stderr, "{}\n", GL::GetContextInfo());
 
     Imgui::Context imgui_context;
     imgui_context.create({.window = window});

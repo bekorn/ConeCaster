@@ -621,13 +621,13 @@ struct Scene
         for (auto & hittable: hittables.hittables)
             heuristics.emplace_back(hittable, hittable->aabb().center());
 
-        timer.timeit(std::clog, "BVH Heuristic calculated");
+        timer.timeit(stderr, "BVH Heuristic calculated");
 
         bvh.create(heuristics);
-        timer.timeit(std::clog, "BVH generated");
+        timer.timeit(stderr, "BVH generated");
 
         bvh_8wide.create(heuristics);
-        timer.timeit(std::clog, "BVH_8wide generated");
+        timer.timeit(stderr, "BVH_8wide generated");
     }
 
     f32x3 get_background_color(f32x3 const & dir)

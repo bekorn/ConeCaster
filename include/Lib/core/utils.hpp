@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include <iomanip>
+#include "fmt/core.h"
+#include "fmt/chrono.h"
 
 #include "core.hpp"
 
@@ -51,6 +53,16 @@ struct Timer
 			<< " | CPU:" << std::setw(16) << time_elapsed.cpu
 			<< " | Wall:" << std::setw(16) << time_elapsed.wall
 			<< '\n' << std::left;
+	}
+
+	void timeit(FILE * out, std::string_view tag)
+	{
+		auto time_elapsed = timeit();
+
+		fmt::print(out,
+			"{:>32} | CPU: {:>16} | Wall: {:>16}\n",
+			tag, time_elapsed.cpu, time_elapsed.wall
+		);
 	}
 };
 
