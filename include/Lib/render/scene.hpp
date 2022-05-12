@@ -451,8 +451,13 @@ struct Triangle final : Hittable
         auto _k = cross(ray.dir, edge_0to2);
         auto determinant = dot(edge_0to1, _k);
 
+#if true // 2-sided
         if (glm::abs(determinant) < glm::epsilon<f32>())
             return {.is_hit = false};
+#else
+        if (determinant < glm::epsilon<f32>())
+            return {.is_hit = false};
+#endif
 
         auto _m = ray.pos - vert[0];
         auto u = dot(_m, _k) / determinant;
@@ -465,15 +470,21 @@ struct Triangle final : Hittable
             return {.is_hit = false};
         
         auto t = dot(edge_0to2, _n) / determinant;
+        if (not range.contains(t))
+            return {.is_hit = false};
+
         auto pos = ray.at(t);
         auto normal = normalize(cross(edge_0to1, edge_0to2));
+#if true // 2-sided
+        normal *= glm::sign(determinant);
+#endif
         auto barycentric = f32x3{1 - u - v, u, v};
-
         return {
             .is_hit = true,
             .pos = pos,
             .dist = t,
             .normal = normal,
+            // .attenuation = normal,
             .attenuation = {barycentric[0] * col[0] + barycentric[1] * col[1] + barycentric[2] * col[2]},
             // .attenuation = {0.2, 0.4, 1},
         };
