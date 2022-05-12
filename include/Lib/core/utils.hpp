@@ -104,6 +104,15 @@ struct Random
 			return std::uniform_real_distribution<T>(min, max)(generator);
 	}
 
+	template<typename Vec>
+	static Vec next(Vec::value_type const & min, Vec::value_type const & max)
+	{
+		Vec result;
+		for (auto i = 0; i < Vec::length(); ++i)
+			result[i] = next(min, max);
+		return result;
+	}
+
 	template<glm::length_t L, typename T, glm::qualifier Q>
 	static glm::vec<L, T, Q> next(glm::vec<L, T, Q> const & min, glm::vec<L, T, Q> const & max)
 	{
@@ -115,7 +124,7 @@ struct Random
 
 	static f32x3 next_in_unit_cube()
 	{
-		return next(f32x3{-1, -1, -1}, f32x3{1, 1, 1});
+		return next<f32x3>(-1, 1);
 	}
 
 	// for the next 2 functions see https://datagenetics.com/blog/january32020/index.html
@@ -134,7 +143,7 @@ struct Random
 
 	static f32x3 next_on_unit_sphere()
 	{
-		// return normalize(next(f32x3(-1), f32x3(1)));
+		// return normalize(next<f32x3>(-1, 1));
 		return normalize(next_in_unit_sphere());
 	}
 };

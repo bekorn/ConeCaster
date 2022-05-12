@@ -587,9 +587,8 @@ struct Scene
         for (auto & sphere: spheres)
         {
             sphere.r = Random::next<f32>(5, 10);
-            sphere.pos = Random::next(f32x3(-200), f32x3(200));
-            // sphere.color = sphere.pos / 512.f;
-            sphere.color = Random::next(f32x3(0), f32x3(1));
+            sphere.pos = Random::next<f32x3>(-200, 200);
+            sphere.color = Random::next<f32x3>(0, 1);
         }
 
         f32x3 vertices[] = {

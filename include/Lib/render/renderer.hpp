@@ -172,7 +172,7 @@ struct Renderer
             points[0] = {0, 0};
 
             for (auto i = 1; i < points.size(); ++i)
-                points[i] = Random::next(f32x2(-0.5), f32x2(0.5));
+                points[i] = Random::next<f32x2>(-0.5, 0.5);
 
             return points;
         }();
@@ -196,7 +196,7 @@ struct Renderer
 
         for (auto _ = 0; _ < count; ++_)
         {
-            auto pixel = Random::next(u32x2{0, 0}, image.dimensions - u32(1));
+            auto pixel = Random::next(u32x2(0), image.dimensions - u32(1));
             auto ray = camera.get_ray(f32x2(pixel) * pos_normalizer);
             ray.color = {1, 1, 1};
             ray.pixel = pixel;
