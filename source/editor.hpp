@@ -152,18 +152,15 @@ struct Editor
             is_changed |= DragFloat("VFOV", &camera_definition.vfov);
             PopID();
             if (is_changed)
-            {
                 renderer.camera.create(camera_definition);
-                std::cout << "Changed camera settings\n";
-            }
         }
 
-        TextUnformatted("Sphere[0]");
-        auto & sphere = renderer.scene.spheres[0];
-        PushID("Sphere[0]");
-        DragFloat3("Position", begin(sphere.pos));
-        DragFloat("Radius", &sphere.r);
-        ColorEdit3("Color", begin(sphere.color));
+        TextUnformatted("Triangle[0]");
+        auto & tri = renderer.scene.tris[0];
+        PushID("Triangle[0]");
+        DragFloat3("Vertex[0]", begin(tri.vert[0]));
+        DragFloat3("Vertex[1]", begin(tri.vert[1]));
+        DragFloat3("Vertex[2]", begin(tri.vert[2]));
         PopID();
         End();
     }

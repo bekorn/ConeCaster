@@ -187,6 +187,7 @@ struct Hit
     f32x3 pos;
     f32 dist;
     f32x3 normal;
+    f32x3 barycentric;
 
     f32x3 attenuation;
 };
@@ -386,58 +387,9 @@ struct BoundingVolume_8wide final : Hittable
     }
 };
 
-struct Sphere final : Hittable
-{
-    f32x3 pos;
-    f32 r;
-    f32x3 color;
-
-    Hit hit(Ray const & ray, Range<f32> range) const final
-    {
-        // |(A + tD) - C| = r solutions for t are the intersections
-        auto to_ray = ray.pos - pos;
-
-        // a*t^2 + b*t + c = 0
-        auto a = dot(ray.dir, ray.dir);
-        auto b = 2 * dot(to_ray, ray.dir);
-        auto c = dot(to_ray, to_ray) - r * r;
-        auto discriminant = b * b - 4 * a * c;
-
-        if (discriminant < 0) // No Solution
-            return { .is_hit = false };
-
-        auto sqrt_discr = glm::sqrt(discriminant);
-        f32 distance;
-        if (auto root = (-b - sqrt_discr) / (2 * a); range.contains(root))
-            distance = root;
-        else if (auto root = (-b + sqrt_discr) / (2 * a); range.contains(root))
-            distance = root;
-        else
-            return { .is_hit = false };
-
-        auto hit_pos = ray.at(distance);
-        return Hit{
-            .is_hit = true,
-            .pos = hit_pos,
-            .dist = distance,
-            .normal = (hit_pos - pos) / r,
-            .attenuation = color,
-        };
-    }
-
-    AABB aabb() const final
-    {
-        return {
-            .min = pos - r,
-            .max = pos + r
-        };
-    }
-};
-
 struct Triangle final : Hittable
 {
     f32x3 vert[3];
-    f32x3 col[3];
 
     Hit hit(Ray const & ray, Range<f32> range) const
     { return hit_mt(ray, range); }
@@ -451,8 +403,13 @@ struct Triangle final : Hittable
         auto _k = cross(ray.dir, edge_0to2);
         auto determinant = dot(edge_0to1, _k);
 
+#if true // 2-sided
         if (glm::abs(determinant) < glm::epsilon<f32>())
             return {.is_hit = false};
+#else
+        if (determinant < glm::epsilon<f32>())
+            return {.is_hit = false};
+#endif
 
         auto _m = ray.pos - vert[0];
         auto u = dot(_m, _k) / determinant;
@@ -465,16 +422,23 @@ struct Triangle final : Hittable
             return {.is_hit = false};
         
         auto t = dot(edge_0to2, _n) / determinant;
+        if (not range.contains(t))
+            return {.is_hit = false};
+
         auto pos = ray.at(t);
         auto normal = normalize(cross(edge_0to1, edge_0to2));
+#if true // 2-sided
+        normal *= glm::sign(determinant);
+#endif
         auto barycentric = f32x3{1 - u - v, u, v};
-
         return {
             .is_hit = true,
             .pos = pos,
             .dist = t,
             .normal = normal,
-            .attenuation = {barycentric[0] * col[0] + barycentric[1] * col[1] + barycentric[2] * col[2]},
+            .barycentric = barycentric,
+            // .attenuation = normal,
+            .attenuation = barycentric,
             // .attenuation = {0.2, 0.4, 1},
         };
     }
@@ -525,7 +489,7 @@ struct Triangle final : Hittable
             .pos = pos,
             .dist = t,
             .normal = normal,
-            .attenuation = {barycentric[0] * col[0] + barycentric[1] * col[1] + barycentric[2] * col[2]},
+            .attenuation = barycentric,
         };
     }
 
@@ -576,7 +540,7 @@ struct Scene
 {
     f32x3 background_color_up{0.63, 0.87, 0.99};
     f32x3 background_color_down{1, 1, 1};
-    std::array<Sphere, 3> spheres;
+    array<Triangle, 1000> tris;
 
     HittableVector hittables;
     BoundingVolume bvh;
@@ -584,35 +548,29 @@ struct Scene
 
     void create()
     {
-        for (auto & sphere: spheres)
+        for (auto & tri: tris)
         {
-            sphere.r = Random::next<f32>(5, 10);
-            sphere.pos = Random::next(f32x3(-200), f32x3(200));
-            // sphere.color = sphere.pos / 512.f;
-            sphere.color = Random::next(f32x3(0), f32x3(1));
+            auto center = Random::next<f32x3>(-200, 200);
+            auto size = Random::next<f32>(30, 50);
+            tri.vert[0] = center;
+            tri.vert[1] = center + Random::next<f32x3>(-size, size);
+            tri.vert[2] = center + Random::next<f32x3>(-size, size);
         }
 
-        f32x3 vertices[] = {
-            {-120, 0, 0},
-            {200, 0, 0},
-            {0, 0, 100},
-        };
-        f32x3 colors[] = {
-            {1, 0, 0},
-            {0, 1, 0},
-            {0, 0, 1},
-        };
-        auto triangle = new Triangle();
-        for (auto i = 0; i < 3; ++i)
-            triangle->vert[i] = vertices[i], triangle->col[i] = colors[i];
-        hittables.hittables.push_back(triangle);
+        {
+            f32x3 vertices[] = {
+                {-120, 0, 0},
+                {200, 0, 0},
+                {0, 0, 100},
+            };
+            auto & tri = tris[0];
+            for (auto i = 0; i < 3; ++i)
+                tri.vert[i] = vertices[i];
+        }
 
-        for (auto i = 0; i < 3; ++i)
-            spheres[i].pos = vertices[i], spheres[i].color = colors[i], spheres[i].r = 10;
-
-        hittables.hittables.reserve(spheres.size() + 1);
-        for (auto & sphere: spheres)
-            hittables.hittables.push_back(&sphere);
+        hittables.hittables.reserve(tris.size());
+        for (auto & tri: tris)
+            hittables.hittables.push_back((Hittable*)&tri);
 
         Timer timer;
 
