@@ -1,10 +1,10 @@
 #pragma once
 
+#include ".pch.hpp"
+
 #include "Lib/core/expected.hpp"
 #include "Lib/opengl/core.hpp"
 #include "Lib/opengl/util.hpp"
-
-#include ".pch.hpp"
 
 namespace GLFW
 {
@@ -12,7 +12,7 @@ namespace GLFW
 	{
 		static void error_callback(i32 error, const char* description)
 		{
-			std::cerr << "GLFW Error " << error << ": " << description << '\n';
+			fmt::print(stderr, "GLFW Error {}: \n", error, description);
 		}
 
 		CTOR(Context, default)
@@ -24,7 +24,7 @@ namespace GLFW
 			glfwSetErrorCallback(error_callback);
 
 			if (glfwInit())
-				std::clog << "GLFW initialized\n";
+				fmt::print(stderr, "GLFW initialized\n");
 			else
 				return "GLFW failed to initialize";
 
@@ -81,7 +81,7 @@ namespace GLFW
 			);
 
 			if (glfw_window != nullptr)
-				std::clog << "GLFW Window created\n";
+				fmt::print(stderr, "GLFW Window created\n");
 			else
 				return "GLFW Window failed to create";
 
@@ -107,7 +107,7 @@ namespace GLFW
 				glDebugMessageCallback(DebugCallback, nullptr);
 				glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
 				
-				std::clog << "GL Debug initialized\n";
+				fmt::print(stderr, "GL Debug initialized\n");
 			}
 
 			glfwSetWindowSizeCallback(glfw_window, resize_callback);

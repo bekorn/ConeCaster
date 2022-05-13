@@ -77,6 +77,6 @@ namespace GL
 		if (message[length - 2] != '\n')
 			out << '\n';
 
-		std::clog << out.str();
+		fmt::print(stderr, "{}", out.str());
 	}// @formatter:on
 }

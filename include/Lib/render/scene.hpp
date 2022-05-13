@@ -540,7 +540,7 @@ struct Scene
 {
     f32x3 background_color_up{0.63, 0.87, 0.99};
     f32x3 background_color_down{1, 1, 1};
-    array<Triangle, 1000> tris;
+    vector<Triangle> triangles;
 
     HittableVector hittables;
     BoundingVolume bvh;
@@ -548,29 +548,9 @@ struct Scene
 
     void create()
     {
-        for (auto & tri: tris)
-        {
-            auto center = Random::next<f32x3>(-200, 200);
-            auto size = Random::next<f32>(30, 50);
-            tri.vert[0] = center;
-            tri.vert[1] = center + Random::next<f32x3>(-size, size);
-            tri.vert[2] = center + Random::next<f32x3>(-size, size);
-        }
-
-        {
-            f32x3 vertices[] = {
-                {-120, 0, 0},
-                {200, 0, 0},
-                {0, 0, 100},
-            };
-            auto & tri = tris[0];
-            for (auto i = 0; i < 3; ++i)
-                tri.vert[i] = vertices[i];
-        }
-
-        hittables.hittables.reserve(tris.size());
-        for (auto & tri: tris)
-            hittables.hittables.push_back((Hittable*)&tri);
+        hittables.hittables.reserve(triangles.size());
+        for (auto & triangle : triangles)
+            hittables.hittables.push_back((Hittable*)&triangle);
 
         Timer timer;
 

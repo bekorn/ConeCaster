@@ -1,11 +1,10 @@
 #pragma once
 
 #include <unordered_map>
-#include <ostream>
 
 #include "Lib/core/core.hpp"
-#include "Lib/core/intrinsics.hpp"
 #include "Lib/core/named.hpp"
+#include "Lib/core/intrinsics.hpp"
 
 namespace Geometry
 {
@@ -41,28 +40,6 @@ namespace Geometry
 				}
 			};
 		};
-
-		std::ostream & operator<<(std::ostream & os, Key::Common semantic)
-		{
-			using enum Key::Common;
-			switch (semantic)
-			{
-			case POSITION: return os << "POSITION";
-			case NORMAL: return os << "NORMAL";
-			case TANGENT: return os << "TANGENT";
-			case TEXCOORD: return os << "TEXCOORD";
-			case COLOR: return os << "COLOR";
-			case JOINTS: return os << "JOINTS";
-			case WEIGHTS: return os << "WEIGHTS";
-			}
-			unreachable();
-		}
-
-		std::ostream & operator<<(std::ostream & os, Key const & key)
-		{
-			std::visit([&os](auto const & s) { os << s; }, key.name);
-			return os << ':' << static_cast<u32>(key.layer);
-		}
 
 		struct Type
 		{
@@ -101,6 +78,7 @@ namespace Geometry
 				case I32NORM:
 				case U32NORM: return 4;
 				}
+				unreachable();
 			}
 
 			bool is_normalized() const
@@ -121,30 +99,9 @@ namespace Geometry
 				case I32:
 				case U32: return false;
 				}
+				unreachable();
 			}
 		};
-
-		std::ostream & operator<<(std::ostream & os, Type::Value type)
-		{
-			using enum Type::Value;
-			switch (type)
-			{
-			case F32: return os << "F32";
-			case I8: return os << "I8";
-			case I16: return os << "I16";
-			case I32: return os << "I32";
-			case I8NORM: return os << "I8NORM";
-			case I16NORM: return os << "I16NORM";
-			case I32NORM: return os << "I32NORM";
-			case U8: return os << "U8";
-			case U16: return os << "U16";
-			case U32: return os << "U32";
-			case U8NORM: return os << "U8NORM";
-			case U16NORM: return os << "U16NORM";
-			case U32NORM: return os << "U32NORM";
-			}
-			unreachable();
-		}
 
 		struct Data
 		{
@@ -166,3 +123,73 @@ namespace Geometry
 	};
 }
 
+template<>
+struct fmt::formatter<Geometry::Attribute::Key::Common> : formatter<std::string_view>
+{
+	template<typename FormatContext>
+	auto format(Geometry::Attribute::Key::Common const & semantic, FormatContext & ctx)
+	{
+		using enum Geometry::Attribute::Key::Common;
+		switch (semantic)
+		{
+		case POSITION: return formatter<std::string_view>::format("POSITION", ctx);
+		case NORMAL: return formatter<std::string_view>::format("NORMAL", ctx);
+		case TANGENT: return formatter<std::string_view>::format("TANGENT", ctx);
+		case TEXCOORD: return formatter<std::string_view>::format("TEXCOORD", ctx);
+		case COLOR: return formatter<std::string_view>::format("COLOR", ctx);
+		case JOINTS: return formatter<std::string_view>::format("JOINTS", ctx);
+		case WEIGHTS: return formatter<std::string_view>::format("WEIGHTS", ctx);
+		}
+		unreachable();
+	}
+};
+
+template<>
+struct fmt::formatter<Geometry::Attribute::Key>
+{
+	template <typename ParseContext>
+	constexpr auto parse(ParseContext & ctx)
+	{ return ctx.end(); }
+
+	template <typename FormatContext>
+	auto format(Geometry::Attribute::Key const & key, FormatContext & ctx)
+	{
+		if (std::holds_alternative<std::string>(key.name))
+			return fmt::format_to(ctx.out(), "{}:{}", std::get<std::string>(key.name), key.layer);
+		else
+			return fmt::format_to(ctx.out(), "{}:{}", std::get<Geometry::Attribute::Key::Common>(key.name), key.layer);
+
+		// auto out = ctx.out();
+		// std::visit(
+		// 	[&](auto const & name) { out = fmt::format_to(ctx.out(), "{}:{}", name, key.layer); },
+		// 	key.name
+		// );
+		// return out;
+	}
+};
+
+template<>
+struct fmt::formatter<Geometry::Attribute::Type::Value> : formatter<std::string_view>
+{
+	template<typename FormatContext>
+	auto format(Geometry::Attribute::Type::Value const & type, FormatContext & ctx)
+	{
+		using enum Geometry::Attribute::Type::Value;
+		switch (type)
+		{
+		case F32: return formatter<std::string_view>::format("F32", ctx);
+		case I8: return formatter<std::string_view>::format("I8", ctx);
+		case I16: return formatter<std::string_view>::format("I16", ctx);
+		case I32: return formatter<std::string_view>::format("I32", ctx);
+		case I8NORM: return formatter<std::string_view>::format("I8NORM", ctx);
+		case I16NORM: return formatter<std::string_view>::format("I16NORM", ctx);
+		case I32NORM: return formatter<std::string_view>::format("I32NORM", ctx);
+		case U8: return formatter<std::string_view>::format("U8", ctx);
+		case U16: return formatter<std::string_view>::format("U16", ctx);
+		case U32: return formatter<std::string_view>::format("U32", ctx);
+		case U8NORM: return formatter<std::string_view>::format("U8NORM", ctx);
+		case U16NORM: return formatter<std::string_view>::format("U16NORM", ctx);
+		case U32NORM: return formatter<std::string_view>::format("U32NORM", ctx);
+		}
+	}
+};

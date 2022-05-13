@@ -1,10 +1,5 @@
 #pragma once
 
-#include <iostream>
-#include <iomanip>
-#include "fmt/core.h"
-#include "fmt/chrono.h"
-
 #include "core.hpp"
 
 #include <chrono>
@@ -43,17 +38,6 @@ struct Timer
 
 		return {cpu_diff, wall_diff};
 	};
-
-	void timeit(std::ostream & out, std::string_view tag)
-	{
-		auto time_elapsed = timeit();
-
-		out << std::right
-			<< std::setw(32) << tag
-			<< " | CPU:" << std::setw(16) << time_elapsed.cpu
-			<< " | Wall:" << std::setw(16) << time_elapsed.wall
-			<< '\n' << std::left;
-	}
 
 	void timeit(FILE * out, std::string_view tag)
 	{
@@ -154,9 +138,8 @@ struct Random
 // TODO(bekorn): this is demonstrative but still much better than depending on macros
 void log(std::string_view message, std::source_location const location = std::source_location::current())
 {
-	std::cout
-		<< "LOG "
-		<< location.file_name() << "(" << location.line() << ") " << location.function_name() << ':'
-		<< message
-		<< '\n';
+	fmt::print(
+		"LOG {}({}) {}: {}\n",
+		location.file_name(), location.line(), location.function_name(), message
+	);
 }

@@ -1,11 +1,11 @@
-#include <iostream>
-
 #include "Lib/core/.hpp"
 #include "Lib/display/.hpp"
 #include "Lib/opengl/.hpp"
+#include "Lib/gltf/.hpp"
 #include "Lib/render/.hpp"
 
 #include "editor.hpp"
+#include "assets.hpp"
 
 i32 main()
 {
@@ -33,23 +33,49 @@ i32 main()
     Imgui::Context imgui_context;
     imgui_context.create({.window = window});
 
-	Render::FrameInfo frame_info;
-	Render::FrameInfo previous_frame_info{
-		.idx = 0,
-		.seconds_since_start = glfwGetTime(),
-		.seconds_since_last_frame = 0,
-	};
+	Assets assets;
+	assets.create();
 
 	Render::Renderer renderer;
+
 	renderer.camera.create({
 		.pos = {0, -500, 0},
 		.target = {0, 0, 0},
 		.up = {0, 0, 1},
 		.vfov = 60
 	});
+
+	for (auto const & [_, mesh] : assets.meshes)
+	{
+		for (auto const & drawable : mesh.drawables)
+		{
+			auto & primitve = drawable.primitive;
+			auto vertices = primitve.attributes.at({Geometry::Attribute::Key::Common::POSITION}).buffer.data_as<f32x3>();
+			auto & triangles = renderer.scene.triangles;
+			triangles.reserve(triangles.size() + primitve.indices.size() / 3);
+
+			auto indices_end = primitve.indices.end();
+			Render::Triangle tri;
+			for (auto index = primitve.indices.begin(); index != indices_end; index += 3)
+			{
+				tri.vert[0] = vertices[*(index + 0)];
+				tri.vert[1] = vertices[*(index + 1)];
+				tri.vert[2] = vertices[*(index + 2)];
+				triangles.push_back(tri);
+			}
+		}
+	}
+
 	renderer.create({512, 512});
 
 	Editor editor(renderer);
+
+	Render::FrameInfo frame_info;
+	Render::FrameInfo previous_frame_info{
+		.idx = 0,
+		.seconds_since_start = glfwGetTime(),
+		.seconds_since_last_frame = 0,
+	};
 
 	while (not glfwWindowShouldClose(window))
 	{

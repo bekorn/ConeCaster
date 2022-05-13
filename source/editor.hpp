@@ -155,13 +155,6 @@ struct Editor
                 renderer.camera.create(camera_definition);
         }
 
-        TextUnformatted("Triangle[0]");
-        auto & tri = renderer.scene.tris[0];
-        PushID("Triangle[0]");
-        DragFloat3("Vertex[0]", begin(tri.vert[0]));
-        DragFloat3("Vertex[1]", begin(tri.vert[1]));
-        DragFloat3("Vertex[2]", begin(tri.vert[2]));
-        PopID();
         End();
     }
 };

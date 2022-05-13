@@ -1,5 +1,10 @@
 #pragma once
 
+// {fmt}
+#include "fmt/core.h"
+#include "fmt/format.h"
+#include "fmt/chrono.h"
+
 // Configure GLM
 #define GLM_FORCE_NO_CTOR_INIT
 #define GLM_FORCE_EXPLICIT_CTOR
@@ -22,10 +27,16 @@
 #include <glm/gtc/random.hpp>
 #include <glm/gtx/norm.hpp>
 
+// File IO
+#include <fstream>
+#include <filesystem>
+#include <rapidjson/document.h>
+
 // Handy std classes
 #include <array>
 #include <memory>
-#include <optional>
 #include <span>
+#include <optional>
 #include <variant>
 #include <vector>
+#include <unordered_map>

@@ -1,8 +1,5 @@
 #pragma once
 
-#include <unordered_map>
-#include <iomanip>
-
 #include "core.hpp"
 
 // inspired by https://github.com/skypjack/entt/blob/master/src/entt/core/hashed_string.hpp
@@ -31,15 +28,24 @@ struct Name
 		usize operator()(Name const & name) const
 		{ return name.hash; }
 	};
-
-	friend std::ostream & operator<<(std::ostream & out, Name const & name)
-	{ return out << std::right << std::setw(20) << name.hash << std::left << '|' << name.string; }
 };
 
 Name operator ""_name(char const * literal, usize size)
 {
 	return std::string_view(literal, size);
 }
+
+template<>
+struct fmt::formatter<Name>
+{
+	template <typename ParseCtx>
+	constexpr auto parse(ParseCtx & ctx)
+	{ return ctx.end(); }
+
+	template<typename FormatCtx>
+	constexpr auto format(Name const & name, FormatCtx & ctx)
+	{ return fmt::format_to(ctx.out(), "{:>20} | {}", name.hash, name.string); }
+};
 
 template<typename T>
 struct Named
@@ -61,7 +67,7 @@ struct Managed
 	{
 		auto[it, is_emplaced] = resources.try_emplace(name, std::forward<Args>(args)...);
 		if (not is_emplaced)
-			std::cerr << "!! Resource is not emplaced: " << name << '\n';
+			fmt::print(stderr, "!! Resource is not generated: {}\n", name);
 		return {it->first, it->second};
 	}
 
