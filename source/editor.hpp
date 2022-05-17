@@ -49,8 +49,8 @@ struct Editor
         }
         Checkbox("New Strategy Active", &renderer.activate_new_strategy);
         {
-            static array names = {
-                "None", "BVH", "BVH_8WIDE"
+            static array const names = {
+                "BVH", "BVH_8WIDE"
             };
             if (BeginCombo("Acceleration", names[(u32)renderer.accelerator]))
             {

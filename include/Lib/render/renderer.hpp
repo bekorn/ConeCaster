@@ -129,7 +129,7 @@ struct Renderer
     u32 rays_per_update = 500'000;
     u32 camera_rays_per_update = 0;
     enum class Accelerator
-    { None, BVH, BVH_8WIDE }
+    { BVH, BVH_8WIDE }
     accelerator = Accelerator::BVH_8WIDE;
 
     bool activate_new_strategy = false;
@@ -184,6 +184,8 @@ struct Renderer
                 for (auto i = 0; i < sample_per_pixel; ++i)
                 {
                     auto ray = camera.get_ray((f32x2{x, y} + sub_sample_points[i]) * pos_normalizer);
+                    ray.min = 0;
+                    ray.max = std::numeric_limits<f32>::max();
                     ray.pixel = {x, y};
                     ray.color = {1, 1, 1};
                     rays.push_back(ray);
@@ -198,6 +200,8 @@ struct Renderer
         {
             auto pixel = Random::next(u32x2{0, 0}, image.dimensions - u32(1));
             auto ray = camera.get_ray(f32x2(pixel) * pos_normalizer);
+            ray.min = 0;
+            ray.max = std::numeric_limits<f32>::max();
             ray.color = {1, 1, 1};
             ray.pixel = pixel;
             rays.push_back(ray);
@@ -220,12 +224,10 @@ struct Renderer
             Hit hit;
             switch (accelerator)
             {
-                case Accelerator::None:
-                    hit = scene.hittables.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
                 case Accelerator::BVH:
-                    hit = scene.bvh.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
+                    hit = scene.bvh.hit(ray); break;
                 case Accelerator::BVH_8WIDE:
-                    hit = scene.bvh_8wide.hit(ray, {0, std::numeric_limits<f32>::max()}); break;
+                    hit = scene.bvh_8wide.hit(ray); break;
             }
 
             if (hit.is_hit)
@@ -243,6 +245,8 @@ struct Renderer
                         generated_rays.push_back({
                             .pos = bounce_pos,
                             .dir = bounce_dir,
+                            .min = 0,
+                            .max = std::numeric_limits<f32>::max(),
                             .color = ray.color,
                             .pixel = ray.pixel,
                             .bounce = ray.bounce + 1,

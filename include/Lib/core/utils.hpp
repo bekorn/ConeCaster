@@ -133,6 +133,16 @@ struct Random
 };
 
 
+template<typename T>
+struct CTOR_Counter
+{
+	inline static u64 ctor_count = 0;
+
+	CTOR_Counter()
+	{ ctor_count += 1; }
+};
+
+
 #include <source_location>
 
 // TODO(bekorn): this is demonstrative but still much better than depending on macros

@@ -14,7 +14,7 @@ struct AABB
 {
     f32x3 min, max;
 
-    bool hit(Ray const & ray, Range<f32> const & range) const
+    bool hit(Ray const & ray) const
     {
         // TODO(bekorn): benchmark each method
         // https://godbolt.org/z/1xTx6oa4f
@@ -61,8 +61,8 @@ struct AABB
         auto t1 = (max - ray.pos) * inv_dir;
         auto t_min = glm::min(t0, t1);
         auto t_max = glm::max(t0, t1);
-        auto range_min = compMax(f32x4{t_min, range.min});
-        auto range_max = compMin(f32x4{t_max, range.max});
+        auto range_min = compMax(f32x4{t_min, ray.min});
+        auto range_max = compMin(f32x4{t_max, ray.max});
         return (range_max >= range_min);
     }
 
@@ -82,7 +82,7 @@ struct AABB_8wide
 {
     AABB aabbs[8];
 
-    std::bitset<8> hit(Ray const & ray, Range<f32> const & range) const
+    std::bitset<8> hit(Ray const & ray) const
     {
         auto inv_dir = 1.f / ray.dir;
 
@@ -111,8 +111,8 @@ struct AABB_8wide
         auto t_max_y = _mm256_max_ps(t0_y, t1_y);
         auto t_max_z = _mm256_max_ps(t0_z, t1_z);
 
-        auto range_min = _mm256_max_ps(_mm256_max_ps(_mm256_max_ps(t_min_x, t_min_y), t_min_z), _mm256_set1_ps(range.min));
-        auto range_max = _mm256_min_ps(_mm256_min_ps(_mm256_min_ps(t_max_x, t_max_y), t_max_z), _mm256_set1_ps(range.max));
+        auto range_min = _mm256_max_ps(_mm256_max_ps(_mm256_max_ps(t_min_x, t_min_y), t_min_z), _mm256_set1_ps(ray.min));
+        auto range_max = _mm256_min_ps(_mm256_min_ps(_mm256_min_ps(t_max_x, t_max_y), t_max_z), _mm256_set1_ps(ray.max));
 
         u8 results = _mm256_movemask_ps(_mm256_cmp_ps(range_max, range_min, _CMP_GE_OQ));
         return {results};
@@ -124,7 +124,7 @@ struct AABB_8wide
         u8 hit_count;
     };
 
-    HitsSorted hit_sorted(Ray const & ray, Range<f32> const & range) const
+    HitsSorted hit_sorted(Ray const & ray) const
     {
         auto inv_dir = 1.f / ray.dir;
 
@@ -153,8 +153,8 @@ struct AABB_8wide
         auto t_max_y = _mm256_max_ps(t0_y, t1_y);
         auto t_max_z = _mm256_max_ps(t0_z, t1_z);
 
-        auto range_min = _mm256_max_ps(_mm256_max_ps(_mm256_max_ps(t_min_x, t_min_y), t_min_z), _mm256_set1_ps(range.min));
-        auto range_max = _mm256_min_ps(_mm256_min_ps(_mm256_min_ps(t_max_x, t_max_y), t_max_z), _mm256_set1_ps(range.max));
+        auto range_min = _mm256_max_ps(_mm256_max_ps(_mm256_max_ps(t_min_x, t_min_y), t_min_z), _mm256_set1_ps(ray.min));
+        auto range_max = _mm256_min_ps(_mm256_min_ps(_mm256_min_ps(t_max_x, t_max_y), t_max_z), _mm256_set1_ps(ray.max));
 
         f32 range_mins[8];
         _mm256_storeu_ps(range_mins, range_min);
@@ -194,7 +194,7 @@ struct Hit
 
 struct Hittable
 {
-    virtual Hit hit(Ray const &, Range<f32>) const = 0;
+    virtual Hit hit(Ray &) const = 0;
     virtual AABB aabb() const  = 0;
 };
 
@@ -204,7 +204,7 @@ struct AABBHeuristic
     f32x3 value;
 };
 
-struct BoundingVolume final : Hittable
+struct BoundingVolume final : Hittable, CTOR_Counter<BoundingVolume>
 {
     array<Hittable *, 2> hittables;
     array<AABB, 2> aabbs;
@@ -248,18 +248,18 @@ struct BoundingVolume final : Hittable
         aabbs[1] = hittables[1]->aabb();
     }
 
-    Hit hit(Ray const & ray, Range<f32> range) const final
+    Hit hit(Ray & ray) const final
     {
         Hit closest{.is_hit = false};
 
         for (auto i = 0; i < 2; ++i)
-            if (aabbs[i].hit(ray, range))
+            if (aabbs[i].hit(ray))
             {
-                auto hit = hittables[i]->hit(ray, range);
+                auto hit = hittables[i]->hit(ray);
                 if (hit.is_hit)
                 {
                     closest = hit;
-                    range.max = hit.dist;
+                    ray.max = hit.dist;
                 }
             }
 
@@ -270,7 +270,7 @@ struct BoundingVolume final : Hittable
     { return AABB::merge(aabbs[0], aabbs[1]); }
 };
 
-struct BoundingVolume_8wide final : Hittable
+struct BoundingVolume_8wide final : Hittable, CTOR_Counter<BoundingVolume_8wide>
 {
     array<Hittable *, 8> hittables;
     AABB_8wide aabbs;
@@ -324,7 +324,7 @@ struct BoundingVolume_8wide final : Hittable
                 {
                     hittables[i] = groups[i][0].hittable;
                 }
-                else if (groups[i].size() < 6)
+                else if (groups[i].size() <= 6)
                 {
                     auto bv = new BoundingVolume();
                     bv->create(groups[i]);
@@ -343,34 +343,34 @@ struct BoundingVolume_8wide final : Hittable
             aabbs.aabbs[i] = hittables[i]->aabb();
     }
 
-    Hit hit(Ray const & ray, Range<f32> range) const final
+    Hit hit(Ray & ray) const final
     {
         Hit closest{.is_hit = false};
 
         if constexpr (true) // should use aabb hit distance order
         {
-            auto aabb_hits = aabbs.hit_sorted(ray, range);
+            auto aabb_hits = aabbs.hit_sorted(ray);
             for (auto i = 0; i < aabb_hits.hit_count; ++i)
             {
-                auto hit = hittables[aabb_hits.hittable_idx[i]]->hit(ray, range);
+                auto hit = hittables[aabb_hits.hittable_idx[i]]->hit(ray);
                 if (hit.is_hit)
                 {
                     closest = hit;
-                    range.max = hit.dist;
+                    ray.max = hit.dist;
                 }
             }
         }
         else
         {
-            auto aabb_hits = aabbs.hit(ray, range);
+            auto aabb_hits = aabbs.hit(ray);
             for (auto i = 0; i < 8; ++i)
                 if (aabb_hits[i])
                 {
-                    auto hit = hittables[i]->hit(ray, range);
+                    auto hit = hittables[i]->hit(ray);
                     if (hit.is_hit)
                     {
                         closest = hit;
-                        range.max = hit.dist;
+                        ray.max = hit.dist;
                     }
                 }
         }
@@ -391,11 +391,8 @@ struct Triangle final : Hittable
 {
     f32x3 vert[3];
 
-    Hit hit(Ray const & ray, Range<f32> range) const
-    { return hit_mt(ray, range); }
-
     // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection
-    Hit hit_mt(Ray const & ray, Range<f32> range) const
+    Hit hit(Ray & ray) const
     {
         auto edge_0to1 = vert[1] - vert[0];
         auto edge_0to2 = vert[2] - vert[0];
@@ -422,7 +419,7 @@ struct Triangle final : Hittable
             return {.is_hit = false};
         
         auto t = dot(edge_0to2, _n) / determinant;
-        if (not range.contains(t))
+        if ((t < ray.min) | (ray.max < t))
             return {.is_hit = false};
 
         auto pos = ray.at(t);
@@ -443,56 +440,6 @@ struct Triangle final : Hittable
         };
     }
 
-    // https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/barycentric-coordinates
-    Hit hit_barycentrics(Ray const & ray, Range<f32> range) const
-    {
-        // triangle's plane: dot(hit.pos, normal) + K = 0
-        auto normal = cross(vert[2] - vert[0], vert[1] - vert[0]);
-        auto area2 = length(normal); // length(cross product) yields area * 2
-        normal = normalize(normal);
-        auto K = -dot(vert[0], normal);
-
-        // ray: ray.pos + ray.dir * t = hit.pos;
-        // intersection: t = -(K + dot(ray.pos, normal)) / dot(ray.pos, normal)
-        auto ray_dir_dot_normal = dot(ray.dir, normal);
-        if (glm::abs(ray_dir_dot_normal) < glm::epsilon<f32>()) // ray and plane are parallel
-            return {.is_hit = false};
-
-        auto t = -(K + dot(ray.pos, normal)) / ray_dir_dot_normal;
-        if (not range.contains(t))
-            return {.is_hit = false};
-
-        auto pos = ray.at(t);
-
-        // calculate barycentric coordinates
-        auto cross_0to1 = cross(pos - vert[0], vert[1] - vert[0]);
-        auto cross_1to2 = cross(pos - vert[1], vert[2] - vert[1]);
-        auto cross_2to0 = cross(pos - vert[2], vert[0] - vert[2]);
-        auto barycentric = f32x3{
-            length(cross_1to2) / area2,
-            length(cross_2to0) / area2,
-            0
-        };
-        barycentric.z = 1.f - barycentric.x - barycentric.y;
-
-        // test if pos is inside the triangle
-        auto on_left_of_edge01 = dot(normal, cross_0to1) >= 0.f;
-        auto on_left_of_edge12 = dot(normal, cross_1to2) >= 0.f;
-        auto on_left_of_edge20 = dot(normal, cross_2to0) >= 0.f;
-        auto is_inside = on_left_of_edge01 & on_left_of_edge12 & on_left_of_edge20;
-
-        if (not is_inside)
-            return {.is_hit = false};
-
-        return {
-            .is_hit = true,
-            .pos = pos,
-            .dist = t,
-            .normal = normal,
-            .attenuation = barycentric,
-        };
-    }
-
     AABB aabb() const 
     {
         return {
@@ -502,70 +449,44 @@ struct Triangle final : Hittable
     }
 };
 
-struct HittableVector final : Hittable
-{
-    vector<Hittable *> hittables;
-
-    Hit hit(Ray const & ray, Range<f32> range) const final
-    {
-        Hit closest{.is_hit = false};
-
-        for (auto const & hittable: hittables)
-        {
-            auto hit = hittable->hit(ray, range);
-            if (hit.is_hit)
-            {
-                closest = hit;
-                range.max = hit.dist;
-            }
-        }
-
-        return closest;
-    }
-
-    AABB aabb() const final
-    {
-        assert(not hittables.empty());
-
-        auto aabb = hittables[0]->aabb();
-
-        for (auto i = 1; i < hittables.size(); ++i)
-            AABB::merge(aabb, hittables[i]->aabb());
-
-        return aabb;
-    }
-};
-
 struct Scene
 {
     f32x3 background_color_up{0.63, 0.87, 0.99};
     f32x3 background_color_down{1, 1, 1};
+
     vector<Triangle> triangles;
 
-    HittableVector hittables;
     BoundingVolume bvh;
     BoundingVolume_8wide bvh_8wide;
 
     void create()
     {
-        hittables.hittables.reserve(triangles.size());
-        for (auto & triangle : triangles)
-            hittables.hittables.push_back((Hittable*)&triangle);
-
         Timer timer;
 
         vector<AABBHeuristic> heuristics;
-        heuristics.reserve(hittables.hittables.size());
-        for (auto & hittable: hittables.hittables)
-            heuristics.emplace_back(hittable, hittable->aabb().center());
+        heuristics.reserve(triangles.size());
+        for (auto & triangle: triangles)
+            heuristics.emplace_back((Hittable*)&triangle, triangle.aabb().center());
 
         timer.timeit(stderr, "BVH Heuristic calculated");
 
+        BoundingVolume::ctor_count = BoundingVolume_8wide::ctor_count = 0;
         bvh.create(heuristics);
         timer.timeit(stderr, "BVH generated");
+        fmt::print(
+            "BoundingVolume: {} | BoundingVolume_8wide: {} | Mem: {}\n",
+            BoundingVolume::ctor_count, BoundingVolume_8wide::ctor_count,
+            BoundingVolume::ctor_count * sizeof(BoundingVolume) + BoundingVolume_8wide::ctor_count * sizeof(BoundingVolume_8wide) 
+        );
 
+        BoundingVolume::ctor_count = BoundingVolume_8wide::ctor_count = 0;
         bvh_8wide.create(heuristics);
         timer.timeit(stderr, "BVH_8wide generated");
+        fmt::print(
+            "BoundingVolume: {} | BoundingVolume_8wide: {} | Mem: {}\n",
+            BoundingVolume::ctor_count, BoundingVolume_8wide::ctor_count,
+            BoundingVolume::ctor_count * sizeof(BoundingVolume) + BoundingVolume_8wide::ctor_count * sizeof(BoundingVolume_8wide) 
+        );
     }
 
     f32x3 get_background_color(f32x3 const & dir)
