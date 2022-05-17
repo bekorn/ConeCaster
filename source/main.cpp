@@ -33,6 +33,9 @@ i32 main()
     Imgui::Context imgui_context;
     imgui_context.create({.window = window});
 
+	// create common attribute keys before any asset import
+	Geometry::Attribute::Common::create();
+
 	Assets assets;
 	assets.create();
 
@@ -50,7 +53,7 @@ i32 main()
 		for (auto const & drawable : mesh.drawables)
 		{
 			auto & primitve = drawable.primitive;
-			auto vertices = primitve.attributes.at({Geometry::Attribute::Key::Common::POSITION}).buffer.data_as<f32x3>();
+			auto vertices = primitve.attributes.at(Geometry::Attribute::Common::POSITION).buffer.data_as<f32x3>();
 			auto & triangles = renderer.scene.triangles;
 			triangles.reserve(triangles.size() + primitve.indices.size() / 3);
 

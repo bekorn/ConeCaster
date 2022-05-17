@@ -143,6 +143,44 @@ struct CTOR_Counter
 };
 
 
+#include <map>
+
+struct UniqueStringPool
+{
+	struct View
+	{
+		u32 begin_idx;
+		u32 size;
+
+		operator std::string_view()
+		{ return {pool.data() + begin_idx, size}; }
+	};
+
+	inline static vector<char> pool;
+	inline static std::map<u64, View> hash2view;
+
+	static View get_or_create_key(std::string_view const & name)
+	{
+		auto hash = std::hash<std::string_view>{}(name);
+		auto it = hash2view.find(hash);
+		if (it != hash2view.end())
+			return it->second;
+
+		View view{
+			.begin_idx = u32(pool.size()),
+			.size = u32(name.size())
+		};
+
+		pool.reserve(pool.size() + name.size());
+		pool.insert(pool.end(), name.begin(), name.end());
+
+		hash2view.emplace(hash, view);
+
+		return view;
+	}
+};
+
+
 #include <source_location>
 
 // TODO(bekorn): this is demonstrative but still much better than depending on macros

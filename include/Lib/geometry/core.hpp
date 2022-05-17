@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <map>
 
 #include "Lib/core/core.hpp"
 #include "Lib/core/named.hpp"
@@ -12,33 +13,68 @@ namespace Geometry
 	{
 		struct Key
 		{
-			enum class Common : u8
-			{
-				POSITION,
-				NORMAL,
-				TANGENT,
-				TEXCOORD,
-				COLOR,
-				JOINTS,
-				WEIGHTS,
-			};
-
-			variant<Common, std::string> name;
-			u8 layer;
+			u32 begin_idx;
+			u32 size;
 
 			bool operator==(Key const & other) const
-			{
-				return layer == other.layer and name == other.name;
-			}
+			{ return begin_idx == other.begin_idx; }
 
 			struct Hasher
 			{
 				usize operator()(Key const & key) const
-				{
-					// TODO(bekorn): is this a good hash???
-					return std::hash<decltype(key.layer)>{}(key.layer) ^ std::hash<decltype(key.name)>{}(key.name);
-				}
+				{ return std::hash<u32>{}(key.begin_idx); }
 			};
+		};
+
+		struct KeyPool
+		{
+			inline static vector<char> pool;
+			inline static std::map<u64, Key> hash2key;
+
+			static Key get_or_create_key(std::string_view const & name)
+			{
+				auto hash = std::hash<std::string_view>{}(name);
+
+				auto it = hash2key.find(hash);
+				if (it != hash2key.end())
+					return it->second;
+
+				Key key{
+					.begin_idx = u32(pool.size()),
+					.size = u32(name.size())
+				};
+
+				pool.reserve(pool.size() + name.size());
+				pool.insert(pool.end(), name.begin(), name.end());
+
+				hash2key.emplace(hash, key);
+				return key;
+			}
+
+			static std::string_view get_name(Key key)
+			{ return {pool.data() + key.begin_idx, key.size}; }
+		};
+
+		struct Common
+		{
+			inline static Key POSITION;
+			inline static Key NORMAL;
+			inline static Key TANGENT;
+			inline static Key TEXCOORD;
+			inline static Key COLOR;
+			inline static Key JOINTS;
+			inline static Key WEIGHTS;
+
+			static void create()
+			{
+				Common::POSITION = KeyPool::get_or_create_key("POSITION");
+				Common::NORMAL = KeyPool::get_or_create_key("NORMAL");
+				Common::TANGENT = KeyPool::get_or_create_key("TANGENT");
+				Common::TEXCOORD = KeyPool::get_or_create_key("TEXCOORD");
+				Common::COLOR = KeyPool::get_or_create_key("COLOR");
+				Common::JOINTS = KeyPool::get_or_create_key("JOINTS");
+				Common::WEIGHTS = KeyPool::get_or_create_key("WEIGHTS");
+			}
 		};
 
 		struct Type
@@ -124,47 +160,14 @@ namespace Geometry
 }
 
 template<>
-struct fmt::formatter<Geometry::Attribute::Key::Common> : formatter<std::string_view>
+struct fmt::formatter<Geometry::Attribute::Key> : fmt::formatter<string_view>
 {
-	template<typename FormatContext>
-	auto format(Geometry::Attribute::Key::Common const & semantic, FormatContext & ctx)
-	{
-		using enum Geometry::Attribute::Key::Common;
-		switch (semantic)
-		{
-		case POSITION: return formatter<std::string_view>::format("POSITION", ctx);
-		case NORMAL: return formatter<std::string_view>::format("NORMAL", ctx);
-		case TANGENT: return formatter<std::string_view>::format("TANGENT", ctx);
-		case TEXCOORD: return formatter<std::string_view>::format("TEXCOORD", ctx);
-		case COLOR: return formatter<std::string_view>::format("COLOR", ctx);
-		case JOINTS: return formatter<std::string_view>::format("JOINTS", ctx);
-		case WEIGHTS: return formatter<std::string_view>::format("WEIGHTS", ctx);
-		}
-		unreachable();
-	}
-};
-
-template<>
-struct fmt::formatter<Geometry::Attribute::Key>
-{
-	template <typename ParseContext>
-	constexpr auto parse(ParseContext & ctx)
-	{ return ctx.end(); }
-
 	template <typename FormatContext>
 	auto format(Geometry::Attribute::Key const & key, FormatContext & ctx)
 	{
-		if (std::holds_alternative<std::string>(key.name))
-			return fmt::format_to(ctx.out(), "{}:{}", std::get<std::string>(key.name), key.layer);
-		else
-			return fmt::format_to(ctx.out(), "{}:{}", std::get<Geometry::Attribute::Key::Common>(key.name), key.layer);
-
-		// auto out = ctx.out();
-		// std::visit(
-		// 	[&](auto const & name) { out = fmt::format_to(ctx.out(), "{}:{}", name, key.layer); },
-		// 	key.name
-		// );
-		// return out;
+		auto pool_begin = Geometry::Attribute::KeyPool::pool.begin();
+		string_view key_name(pool_begin + key.begin_idx, key.size);
+		return formatter<string_view>::format(key_name, ctx);
 	}
 };
 

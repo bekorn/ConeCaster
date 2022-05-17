@@ -13,46 +13,20 @@ namespace GLTF
 		Geometry::Attribute::Key IntoAttributeKey(std::string_view name)
 		{
 			using namespace Geometry::Attribute;
-
-			static auto const IntoCommon = [](std::string_view attribute_name) -> optional<Key::Common>
+			
+			if (name[0] == '_') // is custom
 			{
-				using enum Key::Common;
-				if (attribute_name == "POSITION") return POSITION;
-				if (attribute_name == "NORMAL") return NORMAL;
-				if (attribute_name == "TANGENT") return TANGENT;
-				if (attribute_name == "TEXCOORD") return TEXCOORD;
-				if (attribute_name == "COLOR") return COLOR;
-				return nullopt;
-			};
-
-			static std::regex const attribute_pattern("(_)?(.*?)(_\\d+)?");
-
-			std::cmatch match;
-			regex_match(
-				name.data(), name.data() + name.size(),
-				match, attribute_pattern
-			);
-
-			Key key;
-
-			if (match[1].matched) // is custom
-			{
-				key.name = match[2].str();
+				return KeyPool::get_or_create_key(name.substr(1));
 			}
 			else
 			{
-				auto common_name = IntoCommon(std::string_view(match[2].first, match[2].second));
-				if (common_name.has_value())
-					key.name = common_name.value();
-				else
-					key.name = match[2].str();
+				if (name == "POSITION") return Common::POSITION;
+				if (name == "NORMAL") return Common::NORMAL;
+				if (name == "TANGENT") return Common::TANGENT;
+				if (name == "TEXCOORD") return Common::TEXCOORD;
+				if (name == "COLOR") return Common::COLOR;
+				return KeyPool::get_or_create_key(name);
 			}
-
-			key.layer = 0;
-			if (match[3].matched) // has a layer
-				std::from_chars(match[3].first + 1, match[3].second, key.layer);
-
-			return key;
 		}
 
 		Geometry::Attribute::Type IntoAttributeType(u32 type, bool is_normalized)

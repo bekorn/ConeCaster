@@ -15,46 +15,20 @@ namespace GL
 	Geometry::Attribute::Key IntoAttributeKey(std::string_view name)
 	{
 		using namespace Geometry::Attribute;
-
-		static auto const IntoCommon = [](std::string_view attribute_name) -> optional<Key::Common>
+		
+		if (name[0] == '_') // is custom
 		{
-			using enum Key::Common;
-			if (attribute_name == "position") return POSITION;
-			if (attribute_name == "normal") return NORMAL;
-			if (attribute_name == "tangent") return TANGENT;
-			if (attribute_name == "texcoord") return TEXCOORD;
-			if (attribute_name == "color") return COLOR;
-			return nullopt;
-		};
-
-		static std::regex const attribute_pattern("(_)?(.*?)(_\\d+)?");
-
-		std::cmatch match;
-		regex_match(
-			name.data(), name.data() + name.size(),
-			match, attribute_pattern
-		);
-
-		Key key;
-
-		if (match[1].matched) // is custom
-		{
-			key.name = match[2].str();
+			return KeyPool::get_or_create_key(name.substr(1));
 		}
 		else
 		{
-			auto common_name = IntoCommon(std::string_view(match[2].first, match[2].second));
-			if (common_name.has_value())
-				key.name = common_name.value();
-			else
-				key.name = match[2].str();
+			if (name == "position") return Common::POSITION;
+			if (name == "normal") return Common::NORMAL;
+			if (name == "tangent") return Common::TANGENT;
+			if (name == "texcoord") return Common::TEXCOORD;
+			if (name == "color") return Common::COLOR;
+			return KeyPool::get_or_create_key(name);
 		}
-
-		key.layer = 0;
-		if (match[3].matched) // has a layer
-			std::from_chars(match[3].first + 1, match[3].second, key.layer);
-
-		return key;
 	}
 
 	struct ShaderStage : OpenGLObject
@@ -210,7 +184,7 @@ namespace GL
 						.location = static_cast<u32>(query_results[0]),
 						.glsl_type = static_cast<GLenum>(query_results[1]),
 						.per_patch = static_cast<bool>(query_results[2]),
-						.key = IntoAttributeKey(std::string_view(name_buffer.data(), name_size)),
+						.key = IntoAttributeKey({name_buffer.data(), size_t(name_size)}),
 					}
 				);
 			}
