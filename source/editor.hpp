@@ -50,7 +50,7 @@ struct Editor
         Checkbox("New Strategy Active", &renderer.activate_new_strategy);
         {
             static array const names = {
-                "BVH", "BVH_8WIDE"
+                "BVH", "BVH_8WIDE", "JACCO_BVH"
             };
             if (BeginCombo("Acceleration", names[(u32)renderer.accelerator]))
             {

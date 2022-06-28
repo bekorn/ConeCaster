@@ -129,7 +129,7 @@ struct Renderer
     u32 rays_per_update = 500'000;
     u32 camera_rays_per_update = 0;
     enum class Accelerator
-    { BVH, BVH_8WIDE }
+    { BVH, BVH_8WIDE, JACCO_BVH }
     accelerator = Accelerator::BVH_8WIDE;
 
     bool activate_new_strategy = false;
@@ -228,6 +228,8 @@ struct Renderer
                     hit = scene.bvh.hit(ray); break;
                 case Accelerator::BVH_8WIDE:
                     hit = scene.bvh_8wide.hit(ray); break;
+                case Accelerator::JACCO_BVH:
+                    hit = scene.jacco_bvh.hit(ray); break;
             }
 
             if (hit.is_hit)

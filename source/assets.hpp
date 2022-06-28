@@ -23,7 +23,8 @@ struct Assets
     {
         Timer timer;
 
-        auto loaded_data = GLTF::Load({.name = "skull", .path = assets_dir / "skull/scene.gltf"});
+        // auto loaded_data = GLTF::Load({.name = "skull", .path = assets_dir / "skull/scene.gltf"});
+        auto loaded_data = GLTF::Load({.name = "damaged helmet", .path = assets_dir / "damaged_helmet/DamagedHelmet.gltf"});
         timer.timeit(stderr, "Model Loaded");
 
         GLTF::Convert(loaded_data, textures, materials, primitives, meshes);

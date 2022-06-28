@@ -42,9 +42,9 @@ i32 main()
 	Render::Renderer renderer;
 
 	renderer.camera.create({
-		.pos = {0, -500, 0},
-		.target = {0, 0, 0},
-		.up = {0, 0, 1},
+		.pos = {1, 2, 0},
+		.target = {0.1, 0, 0.2},
+		.up = {0, 0, -1},
 		.vfov = 60
 	});
 
