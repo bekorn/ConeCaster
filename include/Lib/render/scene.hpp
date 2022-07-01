@@ -476,52 +476,7 @@ struct JACCO_BVH_Node
 struct JACCO_BVH final : Hittable
 {
     vector<Triangle> tris;
-
     vector<JACCO_BVH_Node> bvh_pool;
-
-    struct Heuristic
-    {
-        u32 tri_idx; // TODO(bekorn): tri_idxs can be a seperate array 
-        AABB aabb;
-        f32x3 centroid;
-    };
-
-    void create(vector<Triangle> const & triangles)
-    {
-        fmt::print("Creating a JACCO_BVH with {} triangles\n", triangles.size());
-
-        // preperation
-        auto tri_count = triangles.size();
-
-        auto heuristic = make_unique_array<Heuristic>(tri_count);
-        for (auto i = 0; i < tri_count; i++)
-        {
-            auto & t = triangles[i];
-            auto & h = heuristic[i];
-            h.tri_idx = i;
-            h.centroid = (t.vert[0] + t.vert[1] + t.vert[2]) * (1.f / 3.f);
-            h.aabb = {
-                .min = min(min(t.vert[0], t.vert[1]), t.vert[2]),
-                .max = max(max(t.vert[0], t.vert[1]), t.vert[2])
-            };
-        }
-
-        //  bvh creation
-        bvh_pool.clear();
-        bvh_pool.reserve(2 * tri_count - 1);
-
-        // add root node
-        bvh_pool.push_back({
-            .tri_offset = 0,
-            .tri_count = u32(tri_count),
-        });
-        subdivide(0, heuristic);
-
-        tris.clear();
-        tris.resize(tri_count);
-        for (auto i = 0; i < tri_count; i++)
-            tris[i] = triangles[heuristic[i].tri_idx];
-    }
 
     Hit hit(Ray & ray) const
     {
@@ -565,17 +520,73 @@ struct JACCO_BVH final : Hittable
 
     AABB aabb() const
     { return bvh_pool[0].aabb; }
+};
 
-private:
-    void subdivide(u32 node_idx, unique_array<Heuristic> & heuristic)
+struct JACCO_BVH_Builder
+{
+    struct PrepData
+    {
+        AABB aabb;
+        f32x3 centroid;
+    };
+
+    unique_array<u32> indices;
+    unique_array<PrepData> prepdata;
+    vector<JACCO_BVH_Node> bvh_pool;
+
+    JACCO_BVH create(vector<Triangle> const & triangles)
+    {
+        fmt::print("Creating a JACCO_BVH with {} triangles\n", triangles.size());
+
+        // preperation
+        auto tri_count = triangles.size();
+
+        indices = make_unique_array<u32>(tri_count);
+        for (auto i = 0; i < tri_count; i++)
+            indices[i] = i;
+
+        prepdata = make_unique_array<PrepData>(tri_count);
+        for (auto i = 0; i < tri_count; i++)
+        {
+            auto & t = triangles[i];
+            auto & p = prepdata[i];
+            p.centroid = (t.vert[0] + t.vert[1] + t.vert[2]) * (1.f / 3.f);
+            p.aabb = {
+                .min = min(min(t.vert[0], t.vert[1]), t.vert[2]),
+                .max = max(max(t.vert[0], t.vert[1]), t.vert[2])
+            };
+        }
+
+        //  bvh creation
+        bvh_pool.reserve(2 * tri_count - 1);
+
+        // add root node
+        bvh_pool.push_back({
+            .tri_offset = 0,
+            .tri_count = u32(tri_count),
+        });
+        subdivide(0);
+
+        // create bvh object
+        JACCO_BVH bvh;
+
+        bvh.tris.resize(tri_count);
+        for (auto i = 0; i < tri_count; i++)
+            bvh.tris[i] = triangles[indices[i]];
+
+        bvh.bvh_pool = move(bvh_pool);
+
+        return bvh;
+    }
+
+    void subdivide(u32 node_idx)
     {
         auto & node = bvh_pool[node_idx];
 
         // update bounds
         node.aabb = AABB::identity();
-
         for (auto i = 0; i < node.tri_count; i++)
-            node.aabb = AABB::merge(node.aabb, heuristic[node.tri_offset + i].aabb);
+            node.aabb = AABB::merge(node.aabb, prepdata[indices[node.tri_offset + i]].aabb);
 
         // subdivide
         if (node.tri_count <= 2)
@@ -590,24 +601,12 @@ private:
 
         auto split_pos = node.aabb.min[split_axis] + 0.5f * extents[split_axis];
 
-        // auto split_idx = std::partition(
-        //     heuristic.get() + node.tri_offset, heuristic.get() + node.tri_offset + node.tri_count,
-        //     [=](auto & h){ return h.centroid[split_axis] < split_pos; }
-        // ) - (heuristic.get() + node.tri_offset);
+        u32 split_idx = std::partition(
+            indices.get() + node.tri_offset,
+            indices.get() + node.tri_offset + node.tri_count,
+            [&](auto & i){ return prepdata[i].centroid[split_axis] < split_pos; }
+        ) - indices.get();
 
-        auto idx_forward = node.tri_offset;
-        auto idx_reverse = idx_forward + node.tri_count - 1;
-        while (idx_forward <= idx_reverse)
-        {
-            if (heuristic[idx_forward].centroid[split_axis] < split_pos)
-                idx_forward++;
-            else
-            {
-                std::swap(heuristic[idx_forward], heuristic[idx_reverse]);
-                idx_reverse--;
-            }
-        }
-        auto split_idx = idx_forward;
         auto left_count = split_idx - node.tri_offset;
 
         if (left_count == 0 || left_count == node.tri_count)
@@ -633,8 +632,8 @@ private:
         node.left_child = left_child;
         node.tri_count = 0;
 
-        subdivide(node.left_child, heuristic);
-        subdivide(node.left_child + 1, heuristic);
+        subdivide(node.left_child);
+        subdivide(node.left_child + 1);
     }
 };
 // JACCO BVH END
@@ -679,7 +678,7 @@ struct Scene
             BoundingVolume::ctor_count * sizeof(BoundingVolume) + BoundingVolume_8wide::ctor_count * sizeof(BoundingVolume_8wide) 
         );
 
-        jacco_bvh.create(triangles);
+        jacco_bvh = JACCO_BVH_Builder().create(triangles);
         timer.timeit(stderr, "JACCO_BVH generated");
         fmt::print(
             "JACCO_BVH_Node: {:Ld} | Mem: {:Ld}\n",
