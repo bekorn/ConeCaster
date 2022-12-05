@@ -1,6 +1,6 @@
 ## 🔻ConeCaster
 
-!(screenshot)[/screenshot.png]
+![screenshot](/screenshot.png)
 
 Currently:
 * Triangle only
