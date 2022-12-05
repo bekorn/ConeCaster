@@ -1,0 +1,11 @@
+Model Information:
+* title:	Skull game asset I made
+* source:	https://sketchfab.com/3d-models/skull-game-asset-i-made-61934e2f9636438585f74dc900577c0c
+* author:	Bazylonator (https://sketchfab.com/Bazylonator)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Skull game asset I made" (https://sketchfab.com/3d-models/skull-game-asset-i-made-61934e2f9636438585f74dc900577c0c) by Bazylonator (https://sketchfab.com/Bazylonator) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
